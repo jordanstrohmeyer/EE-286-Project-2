@@ -3,9 +3,10 @@ bool motion_sensor (bool enable){
   bool motion_sensor_return = false;
   long current_distance;
   first_location = sr04.Distance();
+  printf("%lu", first_location);
   long barrier = first_location - 30;
 
-  while (enable)
+  if (enable)
   {
     current = sr04.Distance();
     if (current < barrier )
