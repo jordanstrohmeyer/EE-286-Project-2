@@ -15,32 +15,39 @@
 #define DT 3
 #define SW 4
 
-SR04 sr04 = SR04(ECHO_PIN, TRIG_PIN);
-ezButton button(SW);  // create ezButton object that attach to SW pin;
-DS3231 clock;
-RTCDateTime dt;
-LiquidCrystal_I2C lcd(0x27, 20, 4);
-
 
 // Used for rotary encoder
 int currentStateCLK;
 int lastStateCLK;
+int gtime_hour;
+int gtime_minute;
 
 // Used for what time to set alarm to
-int ghour = 0;
-int gmin = 0;
+int ahour = 0;
+int amin = 0;
 bool hour_enable = true;
 bool min_enable = false;
+bool motion_enable = false;
 
 // Used for when to set alarm
 bool setAlarm = false;
+// Used to enable the motion sensor
 bool motionSensoEnable = false;
+bool ButtonPressEn = false;
 
 // Used to see how long button pressed for
 unsigned long currenrButtonPress;
 unsigned long lastButtonPress;
 
+// Used to see how long has been since last time check
 unsigned long lastClockCylce;
+
+
+SR04 sr04 = SR04(ECHO_PIN, TRIG_PIN);
+ezButton button(SW);  // create ezButton object that attach to SW pin;
+DS3231 clock;
+RTCDateTime dt;
+LiquidCrystal_I2C lcd(0x27, 20, 4);
 
 
 void setup() {
@@ -59,29 +66,31 @@ void setup() {
   lcd.init();
   // turn on the backlight
   lcd.backlight();
+  lcd.clear();
 }
 
 void loop() {
+  button.loop();  // MUST call the loop() function first
+
+  clockFun();
   buttonHeld();
   changeAlarm();
-  clockFun();
+  checkAlarm();
 }
 void buttonHeld() {
-  // Get current state of button
-  int btnState = digitalRead(SW);
   //If we detect LOW signal, button is being held
-  if (btnState == LOW) {
+  if (button.getState() == 0) {
     // See how long program has been running for
     currenrButtonPress = millis();
     // If button held for longer than two seconds and alarm is not ready to be set
-    if ((currenrButtonPress - lastButtonPress > 2000) && !setAlarm) {
-      button.loop();  // MUST call the loop() function first
-      if (button.isReleased()) {
-        // Once button is released tell user alarm ready to be set
-        Serial.println("Ready to change alarm");
-        // Set true so alarm can be changed
-        setAlarm = true;
-      }
+    if ((currenrButtonPress - lastButtonPress > 1000) && setAlarm == false) {
+      lcd.setCursor(0, 2);
+      lcd.print("                    ");
+      lcd.setCursor(1, 2);
+      // Once button is released tell user alarm ready to be set
+      lcd.print("Ready to set alarm");
+      // Set true so alarm can be changed
+      setAlarm = true;
     }
     // If button not being pressed
   } else {
@@ -90,117 +99,142 @@ void buttonHeld() {
   }
 }
 
+
+void buttonPres() {
+  if (ButtonPressEn == true) {
+    if (button.isReleased()) {
+      Serial.println("Button pressed!");
+
+      // If user is ready to change the minutes then toggle both enables
+      if (hour_enable == true && min_enable == false) {
+        Serial.println("  edwbydwbdwb");
+        // Now user can change the minutes of the alarm
+        hour_enable = false;
+        min_enable = true;
+        // If user presses button again then both minute and hour are set so
+        // we are able to set the alarm
+      } else {
+        // Alarm has been set so set bool to false
+        setAlarm = false;
+        // Reset timer variables
+        currenrButtonPress = millis();
+        lastButtonPress = millis();
+        // Toggle both variables so next time user wants to set alarm they chnag the hour first
+        hour_enable = true;
+        min_enable = false;
+        ButtonPressEn = false;
+        lcd.setCursor(0, 2);
+        lcd.print("                    ");
+        lcd.setCursor(0, 3);
+        lcd.print("                    ");
+      }
+    }
+  }
+}
+
 void changeAlarm() {
-  // Check if alarm is reday to be set
-  while (setAlarm) {
-    // Read the current state of CLK
+
+  if (setAlarm) {
     currentStateCLK = digitalRead(CLK);
 
-    // Check if button is pressed
-    buttonPres();
-
-    // Check if encoder is moved
+    // If last and current state of CLK are different, then pulse occurred
+    // React to only 1 state change to avoid double count
     if (currentStateCLK != lastStateCLK && currentStateCLK == 1) {
 
       // If the DT state is different than the CLK state then
       // the encoder is rotating CCW so decrement
       if (digitalRead(DT) != currentStateCLK) {
-        // If the hour enable is true then we change hours
+        Serial.println("CCW");
+
         if (hour_enable) {
           // Decrement hour
-          ghour--;
+          ahour--;
           // Loop back over to 23 if we go below 0
-          if (ghour < 0) ghour = 23;
+          if (ahour < 0) ahour = 23;
           // If the min enable is true then we change minutes
         } else if (min_enable) {
           // Decrement min
-          gmin--;
+          amin--;
           // Loop back over to 59 if we go below 0
-          if (gmin < 0) gmin = 59;
+          if (amin < 0) amin = 59;
         }
-
-        // If the DT state the same as CLK state then
-        // the encoder is rotating CW so increment
       } else {
+        // Encoder is rotating CW so increment
+        Serial.println("CW");
         // If the hour enable is true then we change hours
         if (hour_enable) {
           // Increment hour
-          ghour++;
+          ahour++;
           // Loop back over to 0 if we go above 23
-          if (ghour > 23) ghour = 0;
+          if (ahour > 23) ahour = 0;
           // If the min enable is true then we change minutes
         } else if (min_enable) {
           // Increment min
-          gmin++;
+          amin++;
           // Loop back over to 0 if we go below 59
-          if (gmin > 59) gmin = 0;
+          if (amin > 59) amin = 0;
         }
       }
-      // Print what the current alarm will be set to
-      Serial.print("Hour: ");
-      Serial.print(ghour);
-      Serial.print(" | Minutes: ");
-      Serial.println(gmin);
+      Serial.println(hour_enable);
+      Serial.println(min_enable);
+      ButtonPressEn = true;
+
+      lcd.setCursor(0, 2);
+      lcd.print("                    ");
+      lcd.setCursor(0, 3);
+      lcd.print("                    ");
+      lcd.setCursor(0, 2);
+      lcd.print("Hour: ");
+      lcd.print(ahour);
+      lcd.setCursor(0, 3);
+      lcd.print("Minutes: ");
+      lcd.print(amin);
     }
+    buttonPres();
     // Remember last CLK state
     lastStateCLK = currentStateCLK;
   }
-  // Put in a slight delay to help debounce the reading
 }
+void clockFun() {
+  if (setAlarm == false) {
+    dt = clock.getDateTime();
+    unsigned long clockTimer = millis();
+    if ((clockTimer - lastClockCylce) > 1000) {
+      lastClockCylce = clockTimer;
+      lcd.setCursor(5, 0);
+      lcd.print(dt.year);
+      lcd.print("-");
+      if (dt.month < 10) lcd.print(0);
+      lcd.print(dt.month);
+      lcd.print("-");
+      lcd.print(dt.day);
+      lcd.setCursor(5, 1);
+      lcd.print(" ");
+      if (dt.hour < 10) lcd.print(0);
+      lcd.print(dt.hour);
+      lcd.print(":");
+      if (dt.minute < 10) lcd.print(0);
+      lcd.print(dt.minute);
+      lcd.print(":");
+      if (dt.second < 10) lcd.print(0);
+      lcd.print(dt.second);
+      lcd.setCursor(4, 2);
+      lcd.print("Alarm: ");
+      if (ahour < 10) lcd.print(0);
+      lcd.print(ahour);
+      if (amin < 10) lcd.print(0);
+      lcd.print(amin);
 
-
-void buttonPres() {
-  button.loop();  // MUST call the loop() function first
-  if (button.isPressed()) {
-    // If user is ready to change the minutes then toggle both enables
-    if (hour_enable && !min_enable) {
-      // Now user can change the minutes of the alarm
-      hour_enable = !hour_enable;
-      min_enable = !min_enable;
-      // If user presses button again then both minute and hour are set so
-      // we are able to set the alarm
-    } else {
-      // Alarm has been set so set bool to false
-      setAlarm = false;
-      Serial.print("Alarm set for: ");
-      // If number less than 10 print leading zero so alarm is easier to read
-      if (ghour < 10) Serial.print(0);
-      Serial.print(ghour);
-      // If number less than 10 print leading zero so alarm is easier to read
-      if (gmin < 10) Serial.print(0);
-      Serial.println(gmin);
-      // Reset timer variables
-      currenrButtonPress = millis();
-      lastButtonPress = millis();
-      // Toggle both variables so next time user wants to set alarm they chnag the hour first
-      hour_enable = !hour_enable;
-      min_enable = !min_enable;
+      gtime_minute = dt.minute;
+      gtime_hour = dt.hour;
     }
   }
 }
 
-void clockFun() {
-  dt = clock.getDateTime();
-  unsigned long clockTimer = millis();
-  if ((clockTimer - lastClockCylce) > 1000) {
-    lastClockCylce = clockTimer;
-    clockTimer = millis();
-    lcd.setCursor(5, 0);
-    lcd.print(dt.year);
-    lcd.print("-");
-    if (dt.month < 10) lcd.print(0);
-    lcd.print(dt.month);
-    lcd.print("-");
-    lcd.print(dt.day);
-    lcd.setCursor(5, 1);
-    lcd.print(" ");
-    if (dt.hour < 10) lcd.print(0);
-    lcd.print(dt.hour);
-    lcd.print(":");
-    if (dt.minute < 10) lcd.print(0);
-    lcd.print(dt.minute);
-    lcd.print(":");
-    if (dt.second < 10) lcd.print(0);
-    lcd.print(dt.second);
+void checkAlarm() {
+  if (setAlarm == false) {
+    if (ahour == gtime_hour && amin == gtime_minute) {
+      alarm_enable = true;
+    }
   }
 }
