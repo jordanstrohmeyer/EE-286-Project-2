@@ -1,20 +1,53 @@
+#include "SR04.h"
+#define TRIG_PIN 12
+#define ECHO_PIN 11
+SR04 sr04 = SR04(ECHO_PIN,TRIG_PIN);
+// long a;
+long first_location, current;
+long barrier = 30;
+bool enable = true;
+
+void setup() {
+   Serial.begin(9600);
+   delay(1000);
+   first_location = sr04.Distance();
+   Serial.print(first_location);
+   Serial.println("first location cm");
+   Serial.print(barrier);
+   Serial.println("barrier cm");
+   motion_sensor(enable);
+}
+
+void loop() {
+
+   // motion_sensor(enable);
+   //a = sr04.Distance();
+   // Serial.print(a);
+   // Serial.println("cm");
+   
+}
+
 bool motion_sensor (bool enable){
   // initialize function variables
   bool motion_sensor_return = false;
   long current_distance;
-  first_location = sr04.Distance();
-  printf("%lu", first_location);
-  long barrier = first_location - 30;
-
-  if (enable)
+  while (enable == true)
   {
     current = sr04.Distance();
+    Serial.print(current);
+    Serial.println("current location cm");
+    delay(2000);
     if (current < barrier )
     {
       motion_sensor_return = true;
+      Serial.println("true");
       return motion_sensor_return;
+      enable = false;
+      
     }
+
   }
   
   return motion_sensor_return;// 
 }
+
