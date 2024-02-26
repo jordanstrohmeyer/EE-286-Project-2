@@ -1,0 +1,88 @@
+#include <Stepper.h>
+
+// declare variables
+int stepCount = 0;         // number of steps the motor has taken
+int stepCount2 = 0;
+const int stepsPerRevolution = 1000; 
+
+
+const int forwardPin = 2;
+const int backwardPin = 3;
+const int lowerTime = 12000;
+const int raiseTime = 12000;
+const int delayTime = 3000;
+int count = 0;
+int condition = 0;
+
+bool motor_enable = true;
+
+Stepper myStepper(stepsPerRevolution, 9, 10, 11, 12);
+Stepper myStepper2(stepsPerRevolution, 9, 11, 10, 12);
+
+
+
+void setup() {
+
+  // initialize pins
+    pinMode(forwardPin, OUTPUT);
+    pinMode (backwardPin, OUTPUT);
+
+  // IF STATEMENT TO RUN CODE
+  if (motor_enable == true)
+  {
+
+
+    Serial.begin(9600);
+
+  while (stepCount2 <= 200)
+      {
+        // step one step:
+        myStepper2.step(1);
+        Serial.print("steps:");
+        Serial.println(stepCount);
+        stepCount2++;
+        delay(5);
+      }
+    
+      // stop
+      digitalWrite (forwardPin, LOW);
+      digitalWrite (backwardPin, LOW);
+      delay (delayTime);
+
+      // lower platform
+      digitalWrite (forwardPin, LOW);
+      digitalWrite (backwardPin, HIGH);
+      delay (lowerTime);
+
+      //stop
+      digitalWrite (forwardPin, HIGH);
+      digitalWrite (backwardPin, HIGH);
+      delay (delayTime);
+
+      //raise platform
+      digitalWrite (forwardPin, HIGH);
+      digitalWrite (backwardPin, LOW);
+      delay (raiseTime);
+
+      count++;
+    
+      // turn motor off
+      digitalWrite (forwardPin, LOW);
+      digitalWrite (backwardPin, LOW);
+    
+      delay(1000);
+
+    while (stepCount <= 100)
+    {
+      myStepper.step(1);
+      Serial.print("steps:");
+      Serial.println(stepCount);
+      stepCount++;
+      delay(5);
+    }
+  }
+}
+
+void loop () {
+
+}
